@@ -159,8 +159,10 @@ function computeBanzhaf(n, k, weights, quotas) {
   }
 
   const totalRaw = rawCount.reduce((a, b) => a + b, 0);
+  const normalizedCount = rawCount.map(count => (count / Math.pow(2, n-1)).toFixed(6));
+  
   return {
-    raw: rawCount,
+    raw: normalizedCount
   };
 }
 
