@@ -108,6 +108,15 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 3px 3px 0 var(--soft-border);
 }
 
+.card.red {
+  background: #fff5f5;
+  border-color: #c0392b;
+  box-shadow: 3px 3px 0 #c0392b;
+}
+.card.red:hover {
+  box-shadow: 5px 5px 0 #c0392b;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
