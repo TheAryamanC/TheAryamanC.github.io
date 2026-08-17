@@ -19,6 +19,73 @@
       </header>
       <main class="content">
         <p>All right sit tight, this will be a hefty read (when I update it, of course).</p>
+        <p>Quantum Weight Predictor (QWP): GNN + Transformer edge-weight prediction network.
+
+Implements the architecture of the paper (Sec. "Graph Construction and Preprocessing"
+and "Quantum Weight Predictor"):
+* node features a_i = [p~ || tau~ || rho~ || PE~ || r_i] in R^{2d}: 2-layer ReLU MLPs
+  project coords/rho/PE to d/4, a single linear layer projects the stabilizer type,
+  r_i is a learnable per-stabilizer embedding; inactive stabilizers get zeroed
+  geometric features but keep their positional encoding,
+* modulated syndrome a'_i = s^_i * a_i with s^ in {-1,+1}^N, then Linear+LayerNorm
+  down-projection 2d -> d,
+* L_layers=4 pre-LayerNorm TransformerConv layers (K=4 heads averaged, gated residual,
+  FFN d->4d->d with GELU),
+* edge embedding e'_ij = [Emb(d_ij) || MLP(dx,dy,tau_edge)] in R^{1.5d},
+* edge tokens u_ij = [h_i || h_j || e'_ij] in R^{3.5d} -> LayerNorm -> standard
+  Transformer Encoder (L_enc=2) -> linear + sigmoid -> p_ij.
+
+Documented choices where the paper is under-specified: sinusoidal 2-D positional
+encoding over lattice coordinates; encoder feed-forward width = d_model (reproduces
+the paper's ~3.9M parameters); the virtual boundary node uses zeroed geometry with the
+positional encoding of coordinate (-1, -1).</p>
+
+          <p>Graph Transformer operator of Shi et al. (ijcai2021p214) -- the paper's
+    TransformerConv -- with the gated residual of the paper's Eqs. (m_i, beta_i, z_i),
+    wrapped in pre-LayerNorm and a GELU FFN.  The `_conv` part is mathematically
+    identical to PyG ``TransformerConv(d, d, heads=K, concat=False, beta=True)``
+    (verified numerically against torch_geometric), evaluated densely over the fixed
+    lattice adjacency so batches are plain (B, N, d) tensors.</p>
+    <p>Train the NMWPM Quantum Weight Predictor.
+
+Reproduces the paper's training protocol: Adam, batch size 32, lr 9e-5 with cosine
+annealing to 1e-5, 500 mini-batches/epoch, loss = BCE(p, y) + 0.01 * H(p), physical
+error rate sampled per batch from 9 distinct rates in the testing range, ground-truth
+edge labels from the clustering heuristic (samples exceeding the 10 s ground-truth
+timeout are discarded; Appendix "Ground Truth Heuristic").
+
+Example (paper configuration, toric code L=8, depolarizing noise):
+    python train.py --code toric --L 8 --noise depolarizing --epochs 400</p>
+
+    <p>Evaluation: NMWPM vs the standard MWPM baseline (logical error rate, threshold
+data, single-shot latency), plus the extension studies:
+
+* --uniform: an untrained control decoder running MWPM with all edge weights = 1.0,
+  isolating the net benefit of learned weights over any weighted matching.
+* --fast-path K: early-exit routing -- syndromes with <= K total defects skip the
+  QWP entirely and are decoded with static canonical weights (for the toric code the
+  matching is provably unique for K <= 3, so the fast path is lossless by
+  construction; K <= 1 for the rotated code).  Applies to both LER evaluation and
+  the latency benchmark, giving latency-vs-accuracy Pareto data.
+* --noise biased --eta E: Z-biased Pauli channel evaluation.
+
+Both decoders run the identical PyMatching pipeline on the complete defect graph;
+only the edge weights differ: the baseline uses static canonical-path lengths, NMWPM
+uses learned weights w_ij = -ln max(p_ij, p_ji) (paper Sec. "Decoding").  Logical
+errors are detected exactly via homology-crossing fault ids: an edge carries fault
+bit l iff its canonical correction path crosses logical support l, so the decoded
+fault vector equals the correction's homology class, compared to the true error's.
+
+Scope note: the paper additionally benchmarks against QECCT, BPOSD-2 and MWPM-Corr;
+those are external baselines with their own codebases and are not reimplemented here.
+
+Examples:
+    python evaluate.py --code toric --L 8 --noise depolarizing \
+        --ckpt nmwpm_toric_L8_depolarizing.pt --p 0.10 0.13 0.16 0.19 --shots 20000
+    python evaluate.py --code toric --L 8 --ckpt nmwpm_toric_L8_depolarizing.pt \
+        --p 0.12 --shots 20000 --uniform --fast-path 3
+    python evaluate.py --code toric --L 8 --ckpt nmwpm_toric_L8_depolarizing.pt \
+        --benchmark --p 0.15 --fast-path 3</p>
       </main>
     </div>
   </div>
