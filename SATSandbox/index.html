@@ -1,18 +1,276 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>SAT Sandbox</title>
-	<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAT Solving Sandbox</title>
+  <meta name="description" content="Interactive SAT Solver">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-	<div class="todo-banner">Come back soon!</div>
-	<main>
-		<h1>SAT Sandbox</h1>
-		<pre id="code" class="empty">Waiting for code&hellip;</pre>
-	</main>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-text">
+          <h1>SAT Solver Sandbox</h1>
+        </div>
+      </div>
+    </div>
+  </header>
 
-	<script src="main.js"></script>
+  <main>
+
+    <!-- 01 · INPUT -->
+    <section class="stage" id="stage-input" aria-labelledby="stage-input-title">
+      <div class="stage-head">
+        <h2 id="stage-input-title">SAT Formula</h2>
+      </div>
+
+      <div class="panel">
+        <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+        <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+        <div class="input-row">
+          <div class="input-col">
+            <label class="field-label" for="dimacsInput">DIMACS CNF</label>
+            <textarea id="dimacsInput" class="mono-input" spellcheck="false" autocapitalize="off" autocomplete="off" rows="14"></textarea>
+            <div class="input-footer">
+              <span id="lineCounter" class="line-counter">0 / 1000 lines</span>
+              <span id="parseStatus" class="parse-status"></span>
+            </div>
+          </div>
+          <div class="input-controls">
+            <div class="btn-row">
+              <button id="btnGenVCG" class="btn btn-secondary" type="button">Generate VCG</button>
+              <button id="btnGenVIG" class="btn btn-secondary" type="button">Generate VIG</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel graph-panel" id="structuralGraphPanel" hidden>
+        <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+        <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+        <div class="graph-tabs" role="tablist">
+          <button class="graph-tab active" data-graph="vcg" type="button">Variable Clause Graph</button>
+          <button class="graph-tab" data-graph="vig" type="button">Variable Interaction Graph</button>
+        </div>
+        <div class="graph-toolbar">
+          <span id="structuralGraphMeta" class="graph-meta"></span>
+          <div class="zoom-controls">
+            <button class="zoom-btn" data-zoom="out" type="button" aria-label="Zoom out">&minus;</button>
+            <!-- <button class="zoom-btn" data-zoom="reset" type="button">Reset</button> -->
+            <button class="zoom-btn" data-zoom="in" type="button" aria-label="Zoom in">&plus;</button>
+          </div>
+        </div>
+        <div id="structuralGraphHost" class="graph-host"></div>
+        <div class="graph-legend" id="structuralGraphLegend"></div>
+      </div>
+    </section>
+
+    <!-- 02 · CONFIGURE -->
+    <section class="stage" id="stage-configure">
+      <div class="stage-head">
+        <h2>Setup</h2>
+      </div>
+
+      <div class="panel config-panel">
+        <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+        <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+
+        <div class="config-grid">
+          <div class="config-field">
+            <label class="field-label">Algorithm</label>
+            <div class="segmented" id="modeSegmented">
+              <button type="button" class="segmented-btn active" data-value="cdcl">CDCL</button>
+              <button type="button" class="segmented-btn" data-value="dpll">DPLL</button>
+            </div>
+          </div>
+
+          <div class="config-field">
+            <label class="field-label" for="heuristicSelect">Decision heuristic</label>
+            <select id="heuristicSelect" class="select">
+              <option value="vsids" selected>VSIDS</option>
+              <option value="jw">Jeroslow&ndash;Wang</option>
+              <option value="dlis">DLIS</option>
+              <option value="random">Random</option>
+              <option value="fixed">Fixed order</option>
+            </select>
+            <p class="field-hint" id="heuristicHint"></p>
+          </div>
+
+          <div class="config-field">
+            <label class="field-label" for="polaritySelect">Polarity (phase)</label>
+            <select id="polaritySelect" class="select">
+              <option value="phase-saving" selected>Phase saving</option>
+              <option value="true">Always true</option>
+              <option value="false">Always false</option>
+              <option value="random">Random</option>
+            </select>
+          </div>
+
+          <div class="config-field">
+            <label class="field-label" for="restartSelect">Restart policy</label>
+            <select id="restartSelect" class="select">
+              <option value="none">None</option>
+              <option value="fixed">Fixed interval</option>
+              <option value="luby" selected>Luby</option>
+              <option value="glucose">Glucose (LBD-based)</option>
+            </select>
+            <p class="field-hint" id="restartHint"></p>
+          </div>
+
+          <div class="config-field">
+            <label class="field-label" for="deletionSelect">Clause DB deletion</label>
+            <select id="deletionSelect" class="select">
+              <option value="none">None (keep all)</option>
+              <option value="activity">Activity-based</option>
+              <option value="size">Size-based</option>
+              <option value="lbd" selected>LBD-based (glue)</option>
+            </select>
+            <p class="field-hint" id="deletionHint"></p>
+          </div>
+
+          <div class="config-field checkbox-field">
+            <label class="checkbox-label">
+              <input type="checkbox" id="pureLiteralCheckbox">
+              Pure literal elimination
+            </label>
+          </div>
+        </div>
+
+        <details class="advanced">
+          <summary>Advanced settings</summary>
+          <div class="advanced-grid">
+            <div class="config-field">
+              <label class="field-label" for="seedInput">Random seed</label>
+              <input type="number" id="seedInput" class="number-input" value="1" min="0" step="1">
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="restartIntervalInput">Fixed restart interval (conflicts)</label>
+              <input type="number" id="restartIntervalInput" class="number-input" value="100" min="1" step="1">
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="lubyUnitInput">Luby unit</label>
+              <input type="number" id="lubyUnitInput" class="number-input" value="32" min="1" step="1">
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="glucoseWindowInput">Glucose window (conflicts)</label>
+              <input type="number" id="glucoseWindowInput" class="number-input" value="30" min="3" step="1">
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="glucoseKInput">Glucose K factor</label>
+              <input type="number" id="glucoseKInput" class="number-input" value="0.8" min="0.1" max="2" step="0.05">
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="reduceIntervalInput">Clause DB reduce interval (conflicts)</label>
+              <input type="number" id="reduceIntervalInput" class="number-input" value="20" min="1" step="1">
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="vsidsDecayInput">VSIDS decay</label>
+              <input type="number" id="vsidsDecayInput" class="number-input" value="0.95" min="0.5" max="0.9999" step="0.01">
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="maxStepsInput">Step safety cap</label>
+              <input type="number" id="maxStepsInput" class="number-input" value="300000" min="1000" step="1000">
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- 03 · EXECUTE -->
+    <section class="stage" id="stage-execute">
+      <div class="stage-head">
+        <h2>Run</h2>
+      </div>
+
+      <div class="panel execute-panel">
+        <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+        <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+        <div class="execute-controls">
+          <button id="btnStep" class="btn btn-primary" type="button">Step</button>
+          <button id="btnRun" class="btn btn-primary btn-accent" type="button">Run</button>
+          <button id="btnPause" class="btn btn-secondary" type="button" hidden>Pause</button>
+          <button id="btnReset" class="btn btn-ghost" type="button">Reset</button>
+        </div>
+        <p class="last-event" id="lastEventText"></p>
+      </div>
+    </section>
+
+
+    <!-- 05 · INSPECT -->
+    <section class="stage" id="stage-inspect">
+      <div class="stage-head">
+        <h2>Internal state</h2>
+      </div>
+
+      <div class="inspect-grid">
+        <div class="panel inspect-panel" id="panelHotVars">
+          <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+          <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+          <h3 class="panel-title">Hot variables</h3>
+          <div id="hotVarsHost" class="hotvars-host"></div>
+        </div>
+
+        <div class="panel inspect-panel" id="panelTrail">
+          <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+          <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+          <h3 class="panel-title">Trail</h3>
+          <div id="trailHost" class="trail-host"></div>
+        </div>
+
+        <div class="panel inspect-panel span-2" id="panelImplication">
+          <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+          <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+          <div class="graph-toolbar">
+            <h3 class="panel-title">Implication graph</h3>
+            <div class="zoom-controls">
+              <button class="zoom-btn" data-zoom-target="implication" data-zoom="out" type="button" aria-label="Zoom out">&minus;</button>
+              <!-- <button class="zoom-btn" data-zoom-target="implication" data-zoom="reset" type="button">Reset</button> -->
+              <button class="zoom-btn" data-zoom-target="implication" data-zoom="in" type="button" aria-label="Zoom in">&plus;</button>
+            </div>
+          </div>
+          <div id="implicationHost" class="graph-host graph-host-tall"></div>
+          <div class="graph-legend" id="implicationLegend"></div>
+        </div>
+
+        <div class="panel inspect-panel span-2" id="panelClauseDB">
+          <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+          <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+          <h3 class="panel-title">Clause database</h3>
+          <div id="clauseDbHost" class="clausedb-host"></div>
+        </div>
+
+        <div class="panel inspect-panel span-2" id="panelStats">
+          <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+          <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+          <h3 class="panel-title">Statistics</h3>
+          <div id="statsHost" class="stats-host"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 · RESULT -->
+    <section class="stage" id="stage-result">
+      <div class="stage-head">
+        <h2>Result</h2>
+      </div>
+      <div class="panel">
+        <span class="panel-corner tl" aria-hidden="true"></span><span class="panel-corner tr" aria-hidden="true"></span>
+        <span class="panel-corner bl" aria-hidden="true"></span><span class="panel-corner br" aria-hidden="true"></span>
+        <pre id="resultOutput" class="mono-output result-waiting"></pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/utils.js"></script>
+  <script src="js/formula.js"></script>
+  <script src="js/dimacs.js"></script>
+  <script src="js/solver.js"></script>
+  <script src="js/graphRender.js"></script>
+  <script src="js/ui.js"></script>
 </body>
 </html>
