@@ -637,12 +637,26 @@
     });
   }
 
+  // Receive DIMACS content posted from the book's DemoSAT click handler.
+  function wirePostMessage() {
+    window.addEventListener('message', (e) => {
+      if (typeof e.data !== 'string' || state.running) return;
+      $('dimacsInput').value = e.data;
+      parseCurrentInput();
+      $('dimacsInput').scrollTop = 0;
+      $('dimacsInput').focus();
+    });
+    // Signal to the opener that the sandbox is ready to receive content.
+    if (window.opener) window.opener.postMessage('ready', '*');
+  }
+
   function init() {
     wireInputPanel();
     wireConfigPanel();
     wireExecutePanel();
     wireZoomControls();
     wireKeyboardShortcut();
+    wirePostMessage();
     updateHints();
     updateModeDependentControls();
     renderImplicationLegend();
